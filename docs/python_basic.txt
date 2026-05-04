@@ -1,0 +1,5 @@
+Python is a simple and popular programming language. It is easy to read and write, so beginners can learn it quickly. Python uses clear words instead of many symbols. You can use Python to build websites, analyze data, automate tasks, and create games. It has basic parts like variables, numbers, strings, lists, and dictionaries. Python also uses if statements, loops, and functions to control code. Indentation is important because it shows code blocks. Many people like Python because it is flexible, powerful, and friendly for new programmers. With practice, you can write useful programs and solve problems step by step.
+
+```
+plaintext
+```

@@ -1,0 +1,13 @@
+[project]
+name = "regenesis-auto-pipeline-system"
+version = "0.1.0"
+description = "Regenesis Auto Pipeline System"
+requires-python = ">=3.11"
+dependencies = [
+    "chromadb>=1.5.8",
+    "langchain-community>=0.4.1",
+    "langchain-groq>=1.1.2",
+    "langchain-text-splitters>=1.1.2",
+    "langgraph>=1.1.10",
+    "python-dotenv>=1.2.2",
+]
