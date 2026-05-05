@@ -50,9 +50,9 @@ header { height: 70px; border-bottom: 1px solid var(--border); display:flex; ali
 .client-tag { font-size:0.75rem; color:var(--text-dim); background: rgba(255,255,255,0.05); padding:5px 12px; border-radius:6px; }
 
 .container { display:flex; flex:1; height: calc(100vh - 60px); overflow:hidden; }
-.chat-section { flex: 0 0 70%; display:flex; flex-direction:column; border-right:1px solid var(--border); background: radial-gradient(circle at top left, rgba(0,210,255,0.03), transparent); }
-.chat-output { flex:1; padding:40px; overflow-y:auto; display:flex; flex-direction:column; gap:25px; }
-.message { max-width:85%; padding:20px; border-radius:16px; line-height:1.6; font-size:0.95rem; }
+.chat-section { flex: 0 0 70%; display:flex; flex-direction:column; border-right:1px solid var(--border); background: radial-gradient(circle at top left, rgba(0,210,255,0.03), transparent); padding:15px; }
+.chat-output { flex:1; padding:15px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; background:var(--panel); border:1px solid var(--border); border-radius:14px; }
+.message { max-width:85%; padding:14px 16px; border-radius:14px; line-height:1.5; font-size:0.93rem; }
 .ai-msg { background: var(--panel); border:1px solid var(--border); border-bottom-left-radius:4px; }
 .user-msg { align-self:flex-end; background:var(--accent); color:#000; font-weight:600; border-bottom-right-radius:4px; }
 .chat-input-area { padding:30px 40px; border-top:1px solid var(--border); display:flex; gap:15px; }
@@ -63,12 +63,12 @@ header { height: 70px; border-bottom: 1px solid var(--border); display:flex; ali
 .eval-section { flex:0 0 30%; background:#0f1218; padding:20px; display:flex; flex-direction:column; gap:15px; overflow-y:auto; }
 .eval-title { font-size:0.7rem; font-weight:800; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; }
 .pipeline-card { background:var(--panel); border-radius:14px; padding:14px; border:1px solid var(--border); }
-.step { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.03); opacity:0.4; }
+.step { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.03); opacity:0.4; color:var(--text-dim); }
 .step:last-child { border:none; }
 .step.active { opacity:1; color:var(--accent); }
 .step.done { opacity:1; color:var(--success); }
 .step.error { opacity:1; color:var(--error); }
-.step-icon { width:32px; height:32px; border-radius:8px; border:1px solid currentColor; display:flex; align-items:center; justify-content:center; font-size:0.8rem; }
+.step-icon { width:32px; height:32px; border-radius:8px; border:2px solid currentColor; display:flex; align-items:center; justify-content:center; font-size:0.8rem; background:rgba(255,255,255,0.02); }
 .step-label { font-size:0.85rem; font-weight:700; display:block; }
 .step-status { font-size:0.7rem; opacity:0.7; }
 #healing-module { margin-top:10px; padding:15px; background: rgba(255,62,109,0.05); border:1px solid rgba(255,62,109,0.15); border-radius:12px; display:none; }
@@ -295,23 +295,15 @@ with left:
                             doc_file.unlink()
                             st.rerun()
             else:
-                st.info("No documents uploaded yet. Upload files above to get started.")
+                st.markdown("<div style='font-size:0.85rem;color:var(--text-dim);padding:10px;'>No documents uploaded yet</div>", unsafe_allow_html=True)
         else:
-            st.info("No documents uploaded yet. Upload files above to get started.")
+            st.markdown("<div style='font-size:0.85rem;color:var(--text-dim);padding:10px;'>No documents uploaded yet</div>", unsafe_allow_html=True)
     
-    st.divider()
-    
-    # Chat area
+    # Chat area - OUTPUT label and messages appear only after execution
     st.markdown("<div class='chat-section'>", unsafe_allow_html=True)
-    st.markdown("<div class='chat-output' id='chat-box'></div>", unsafe_allow_html=True)
+    
+    output_label_placeholder = st.empty()
     chat_output = st.empty()
-    # initial AI greeting
-    chat_output.markdown(
-        """
-        <div class="message ai-msg">Hello! I am the Regenesis safety layer. I am currently monitoring the Client's RAG system for hallucinations. How can I help?</div>
-        """,
-        unsafe_allow_html=True,
-    )
 
     # input area (left)
     input_col1, input_col2 = st.columns([10, 1])
@@ -340,6 +332,9 @@ def execute_query_and_render(query_text: str, chat_out: Any):
     if not query_text.strip():
         st.warning("Please enter a question before sending.")
         return
+
+    # Show OUTPUT label on first execution
+    output_label_placeholder.markdown("<div class='eval-title' style='margin-bottom:12px;'>📤 Output</div>", unsafe_allow_html=True)
 
     # append user message
     chat_out.markdown(f"<div class=\"message user-msg\">{query_text}</div>", unsafe_allow_html=True)
