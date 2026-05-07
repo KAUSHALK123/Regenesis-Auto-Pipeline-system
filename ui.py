@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Streamlit UI for Regenesis Self-Healing RAG System - Professional Glassmorphism Design."""
 
 from __future__ import annotations
@@ -201,17 +202,21 @@ def run_backend_with_trace(question: str) -> dict[str, Any]:
 
 
 def render_step(icon: str, title: str, status: str, status_text: str = "Waiting...") -> str:
-        """Render a step block matching the new theme."""
-        cls = f"step {status.lower()}" if status else "step"
-        return f"""
-<div class="{cls}" id="step-{title.replace(' ', '-').lower()}">
-    <div class="step-icon">{icon}</div>
-    <div>
-        <span class="step-label">{title}</span>
-        <span class="step-status">{status_text}</span>
-    </div>
-</div>
-"""
+    """Render a step block matching the new theme."""
+    cls = f"step {status.lower()}" if status else "step"
+    progress_html = ""
+    if status.lower() == "active":
+        progress_html = "<div class='step-progress-track'><div class='step-progress-fill'></div></div>"
+    return (
+        f'<div class="{cls}" id="step-{title.replace(" ", "-").lower()}">'
+        f'<div class="step-icon">{icon}</div>'
+        f'<div style="flex:1;">'
+        f'<span class="step-label">{title}</span>'
+        f'<span class="step-status">{status_text}</span>'
+        f'{progress_html}'
+        f'</div>'
+        f'</div>'
+    )
 
 
 def render_evaluation_stage(
@@ -226,7 +231,7 @@ def render_evaluation_stage(
     
     return f"""
 <div class="evaluation-section">
-    <div class="eval-title">📊 Evaluation Stage</div>
+    <div class="eval-title">Evaluation Stage</div>
     <div class="eval-metric">
         <span class="eval-label">Document Match</span>
         <span class="eval-value">{doc_match}%</span>
