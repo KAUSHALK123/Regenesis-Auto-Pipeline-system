@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HEAL-IaC | Self-Healing Infrastructure</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+      font-family:'Inter',sans-serif;
+    }
+
+    body{
+      background:
+      radial-gradient(circle at top left, rgba(0,255,255,0.12), transparent 30%),
+      radial-gradient(circle at bottom right, rgba(124,58,237,0.15), transparent 30%),
+      #0a0f1f;
+      color:white;
+      overflow-x:hidden;
+    }
+
+    .glass{
+      background:rgba(255,255,255,0.04);
+      border:1px solid rgba(255,255,255,0.08);
+      backdrop-filter:blur(12px);
+      border-radius:24px;
+    }
+
+    .gradient-text{
+      background:linear-gradient(90deg,#00e5ff,#7c3aed);
+      -webkit-background-clip:text;
+      -webkit-text-fill-color:transparent;
+    }
+
+    .navbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:20px 40px;
+      border-bottom:1px solid rgba(255,255,255,0.08);
+      position:sticky;
+      top:0;
+      z-index:100;
+      background:rgba(10,15,31,0.6);
+      backdrop-filter:blur(12px);
+    }
+
+    .logo{
+      font-size:26px;
+      font-weight:700;
+      letter-spacing:-1px;
+    }
+
+    .nav-links{
+      display:flex;
+      gap:20px;
+      color:#cbd5e1;
+      font-size:14px;
+    }
+
+    .container{
+      width:92%;
+      margin:auto;
+      padding:40px 0 60px;
+    }
+
+    .hero{
+      display:grid;
+      grid-template-columns:1.2fr 1fr;
+      gap:30px;
+      align-items:center;
+      margin-top:30px;
+    }
+
+    .hero h1{
+      font-size:60px;
+      line-height:1.05;
+      margin-bottom:24px;
+    }
+
+    .hero p{
+      color:#cbd5e1;
+      line-height:1.8;
+      font-size:16px;
+      margin-bottom:28px;
+    }
+
+    .btns{
+      display:flex;
+      gap:16px;
+    }
+
+    .btn{
+      padding:14px 22px;
+      border:none;
+      border-radius:14px;
+      cursor:pointer;
+      font-weight:600;
+      transition:0.3s;
+    }
+
+    .primary{
+      background:linear-gradient(90deg,#00e5ff,#7c3aed);
+      color:white;
+    }
+
+    .secondary{
+      background:rgba(255,255,255,0.08);
+      color:white;
+      border:1px solid rgba(255,255,255,0.1);
+    }
+
+    .btn:hover{
+      transform:translateY(-4px);
+    }
+
+    .hero-card{
+      padding:24px;
+    }
+
+    .terminal-mini{
+      background:#050816;
+      border-radius:16px;
+      padding:18px;
+      color:#00ff88;
+      line-height:1.9;
+      font-size:13px;
+      height:250px;
+      overflow:auto;
+    }
+
+    .section-title{
+      text-align:center;
+      font-size:38px;
+      margin:80px 0 30px;
+    }
+
+    .cards{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+      gap:24px;
+    }
+
+    .card{
+      padding:24px;
+      transition:0.3s;
+    }
+
+    .card:hover{
+      transform:translateY(-6px);
+      border-color:rgba(0,229,255,0.4);
+      box-shadow:0 0 20px rgba(0,229,255,0.15);
+    }
+
+    .card h3{
+      color:#00e5ff;
+      margin-bottom:12px;
+    }
+
+    .card p{
+      color:#cbd5e1;
+      line-height:1.8;
+      font-size:14px;
+    }
+
+    .dashboard-grid{
+      margin-top:70px;
+      display:grid;
+      grid-template-columns:0.9fr 1.4fr 0.9fr;
+      gap:24px;
+      min-height:650px;
+    }
+
+    .panel{
+      padding:22px;
+      overflow:hidden;
+    }
+
+    .agent-item{
+      padding:14px;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,0.06);
+      margin-bottom:14px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      transition:0.3s;
+    }
+
+    .agent-active{
+      border-color:#00e5ff;
+      background:rgba(255,255,255,0.06);
+      box-shadow:0 0 20px rgba(0,229,255,0.18);
+    }
+
+    .memory-box{
+      margin-top:20px;
+      background:#050816;
+      border-radius:16px;
+      padding:16px;
+      color:#94a3b8;
+      font-size:13px;
+      line-height:1.8;
+      min-height:140px;
+    }
+
+    textarea{
+      width:100%;
+      height:100%;
+      min-height:560px;
+      background:#050816;
+      border:none;
+      outline:none;
+      color:#00ff88;
+      padding:20px;
+      border-radius:18px;
+      resize:none;
+      font-size:14px;
+      line-height:1.8;
+    }
+
+    .status-badge{
+      padding:6px 12px;
+      border-radius:999px;
+      font-size:11px;
+      border:1px solid rgba(255,0,0,0.4);
+      background:rgba(255,0,0,0.1);
+      color:#ff5c5c;
+    }
+
+    .status-success{
+      background:rgba(0,255,120,0.1);
+      border-color:rgba(0,255,120,0.4);
+      color:#00ff88;
+    }
+
+    .terminal{
+      background:#050816;
+      border-radius:18px;
+      padding:18px;
+      font-family:monospace;
+      font-size:12px;
+      line-height:1.8;
+      color:#00ff88;
+      height:560px;
+      overflow:auto;
+    }
+
+    .footer{
+      text-align:center;
+      margin-top:80px;
+      padding-top:30px;
+      border-top:1px solid rgba(255,255,255,0.08);
+      color:#94a3b8;
+      font-size:14px;
+    }
+
+    @media(max-width:1100px){
+      .dashboard-grid{
+        grid-template-columns:1fr;
+      }
+
+      .hero{
+        grid-template-columns:1fr;
+      }
+
+      .hero h1{
+        font-size:42px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo gradient-text">HEAL-IaC</div>
+
+  <div class="nav-links">
+    <span>Agents</span>
+    <span>Terraform</span>
+    <span>Mem Palace</span>
+    <span>FastAPI</span>
+  </div>
+</nav>
+
+<div class="container">
+
+  <section class="hero">
+
+    <div>
+      <h1>
+        Self-Healing
+        <span class="gradient-text">Infrastructure as Code</span>
+      </h1>
+
+      <p>
+        Autonomous multi-agent AI system that detects,
+        classifies, repairs, validates, and memorizes
+        Terraform infrastructure fixes without human intervention.
+      </p>
+
+      <div class="btns">
+        <button class="btn primary" onclick="startHealing()">
+          Run Healing Pipeline
+        </button>
+
+        <button class="btn secondary">
+          Open Memory Logs
+        </button>
+      </div>
+    </div>
+
+    <div class="glass hero-card">
+      <h3 style="margin-bottom:16px;color:#00e5ff;">
+        Live Infrastructure Status
+      </h3>
+
+      <div class="terminal-mini" id="mini-terminal">
+        > Initializing Multi-Agent System...<br>
+        > Loading Terraform Validator...<br>
+        > Connecting Vector Memory...<br>
+        > Infrastructure AI Ready.
+      </div>
+    </div>
+
+  </section>
+
+  <h2 class="section-title">
+    Multi-Agent Architecture
+  </h2>
+
+  <div class="cards">
+
+    <div class="glass card">
+      <h3>Verifier Agent</h3>
+      <p>
+        Detects Terraform syntax errors, missing attributes,
+        cloud misconfigurations, and infrastructure validation failures.
+      </p>
+    </div>
+
+    <div class="glass card">
+      <h3>Supervisor Agent</h3>
+      <p>
+        Classifies errors into logical, security, syntax,
+        infrastructure, or dependency-based categories.
+      </p>
+    </div>
+
+    <div class="glass card">
+      <h3>Healer Agent</h3>
+      <p>
+        Automatically generates and applies Terraform fixes
+        using LLM reasoning and context-aware corrections.
+      </p>
+    </div>
+
+    <div class="glass card">
+      <h3>Mem Palace</h3>
+      <p>
+        Semantic vector memory that stores previous errors,
+        embeddings, patches, and successful infrastructure fixes.
+      </p>
+    </div>
+
+  </div>
+
+  <div class="dashboard-grid">
+
+    <div class="glass panel">
+
+      <h3 style="margin-bottom:18px;color:#00e5ff;">
+        AI Agent Workflow
+      </h3>
+
+      <div id="agent-list">
+
+        <div id="step-1" class="agent-item">
+          <i data-lucide="search"></i>
+          Verifier Agent
+        </div>
+
+        <div id="step-2" class="agent-item">
+          <i data-lucide="layers"></i>
+          Supervisor Agent
+        </div>
+
+        <div id="step-3" class="agent-item">
+          <i data-lucide="database"></i>
+          Memory Palace
+        </div>
+
+        <div id="step-4" class="agent-item">
+          <i data-lucide="wand-2"></i>
+          Healer Agent
+        </div>
+
+        <div id="step-5" class="agent-item">
+          <i data-lucide="shield-check"></i>
+          Final Validator
+        </div>
+
+      </div>
+
+      <div class="memory-box" id="memory-logs">
+        Waiting for pipeline execution...
+      </div>
+
+    </div>
+
+    <div class="glass panel">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="color:#00e5ff;">Terraform Infrastructure File</h3>
+
+        <div id="status-badge" class="status-badge">
+          ERRORED
+        </div>
+      </div>
+
+      <textarea id="terraform-code">
+resource "aws_instance" "web" {
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = ""
+
+  tags = {
+    Name = "Broken-Server
+  }
+}
+
+resource "aws_s3_bucket" "logs" {
+  # Missing required field 'bucket'
+}
+      </textarea>
+
+    </div>
+
+    <div class="glass panel">
+
+      <h3 style="margin-bottom:18px;color:#00e5ff;">
+        Terminal Output
+      </h3>
+
+      <div class="terminal" id="terminal">
+        > System Ready.<br>
+        > Awaiting Terraform scan...<br>
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Self-Healing IaC using Multi-Agent AI • LangChain • CrewAI • GPT-4 • Terraform • ChromaDB
+  </div>
+
+</div>
+
+<script>
+
+lucide.createIcons();
+
+const logs = [
+  {
+    text: '> Verifier Agent detected syntax error in Terraform file',
+    agent: 'step-1'
+  },
+  {
+    text: '> Supervisor classified issue as Syntax + Configuration Error',
+    agent: 'step-2'
+  },
+  {
+    text: '> Memory Palace found previous successful fix embedding',
+    agent: 'step-3',
+    memory: 'Matched previous error pattern: Missing closing quote + empty instance type'
+  },
+  {
+    text: '> Healer Agent applied infrastructure patch successfully',
+    agent: 'step-4'
+  },
+  {
+    text: '> Final Validator confirmed terraform validate passed',
+    agent: 'step-5'
+  }
+];
+
+const fixedCode = `resource "aws_instance" "web" {
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "Healed-Server"
+  }
+}
+
+resource "aws_s3_bucket" "logs" {
+  bucket = "company-prod-logs-001"
+}`;
+
+function addTerminal(text){
+  const terminal = document.getElementById('terminal');
+  terminal.innerHTML += text + '<br>';
+  terminal.scrollTop = terminal.scrollHeight;
+
+  const mini = document.getElementById('mini-terminal');
+  mini.innerHTML += '<br>' + text;
+  mini.scrollTop = mini.scrollHeight;
+}
+
+async function startHealing(){
+
+  const badge = document.getElementById('status-badge');
+
+  document.querySelectorAll('.agent-item').forEach(el=>{
+    el.classList.remove('agent-active');
+  });
+
+  document.getElementById('memory-logs').innerHTML = 'Scanning vector database...';
+
+  for(let i=0;i<logs.length;i++){
+
+    const item = logs[i];
+
+    document.querySelectorAll('.agent-item').forEach(el=>{
+      el.classList.remove('agent-active');
+    });
+
+    if(item.agent){
+      document.getElementById(item.agent).classList.add('agent-active');
+    }
+
+    addTerminal(item.text);
+
+    if(item.memory){
+      document.getElementById('memory-logs').innerHTML = `
+        <div style="padding:12px;border-radius:14px;background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.2);color:#cbd5e1;">
+          ${item.memory}
+        </div>
+      `;
+    }
+
+    await new Promise(r=>setTimeout(r,1400));
+
+    if(i===3){
+      document.getElementById('terraform-code').value = fixedCode;
+    }
+  }
+
+  badge.innerText = 'HEALED';
+  badge.classList.add('status-success');
+
+  addTerminal('> Infrastructure deployment ready');
+  addTerminal('> Self-healing pipeline completed successfully');
+}
+
+</script>
+
+</body>
+</html>
