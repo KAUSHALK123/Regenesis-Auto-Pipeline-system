@@ -1,402 +1,216 @@
-# -*- coding: utf-8 -*-
-"""Streamlit UI for Regenesis Self-Healing RAG System - Professional Glassmorphism Design."""
+"""
+Streamlit wrapper that embeds the provided HTML/CSS/JS UI design for the AutoHeal IaC demo.
+
+This file replaces the prior Streamlit-native layout with a direct HTML embed so the
+project UI matches the supplied design exactly. Interactive backend wiring can be
+added later (e.g. via query endpoints and window.postMessage) if desired.
+"""
 
 from __future__ import annotations
 
-import io
-import os
-import re
-import threading
-import time
-from contextlib import redirect_stdout
-from pathlib import Path
-from typing import Any
-
 import streamlit as st
+import streamlit.components.v1 as components
 
-from src.rag_agent import run_agent
+st.set_page_config(page_title="AutoHeal IaC | AI Command Center", layout="wide")
 
+HTML_UI = r"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoHeal IaC | AI Command Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body {
+            background: radial-gradient(circle at top left, #0d1117, #161b22);
+            color: #e6edf3;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+        }
+        .neon-text {
+            text-shadow: 0 0 10px #00f2ff, 0 0 20px #00f2ff;
+        }
+        .agent-active {
+            border-color: #00f2ff;
+            box-shadow: 0 0 15px rgba(0, 242, 255, 0.3);
+        }
+        pre { font-family: 'Fira Code', monospace; font-size: 0.85rem; }
+        .scroll-custom::-webkit-scrollbar { width: 6px; }
+        .scroll-custom::-webkit-scrollbar-thumb { background: #30363d; border-radius: 10px; }
+    </style>
+</head>
+<body class="h-screen flex flex-col p-6">
 
-DOCS_DIR = Path(__file__).resolve().parent / "docs"
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tighter flex items-center gap-2">
+                <i data-lucide="shield-check" class="text-cyan-400"></i>
+                AUTOHEAL <span class="text-cyan-400">IaC</span>
+            </h1>
+            <p class="text-xs text-gray-500 uppercase tracking-widest">Multi-Agent Autonomous Infrastructure</p>
+        </div>
+        <div class="flex gap-4">
+            <button onclick="startHealing()" class="bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-2 rounded-full font-bold transition-all transform hover:scale-105">
+                Initiate Healing
+            </button>
+        </div>
+    </header>
 
-st.set_page_config(page_title="Regenesis | AI Guardian Layer", layout="wide")
+    <main class="flex-1 grid grid-cols-12 gap-6 overflow-hidden">
+        
+        <!-- Left: Status & Agents -->
+        <div class="col-span-3 flex flex-col gap-4">
+            <div class="glass p-4">
+                <h3 class="text-sm font-semibold mb-4 text-gray-400 uppercase">System Pipeline</h3>
+                <div id="agent-list" class="space-y-3">
+                    <div id="step-1" class="p-3 rounded-lg border border-white/5 flex items-center gap-3 transition-all">
+                        <i data-lucide="search" class="w-4 h-4"></i> Verifier Agent
+                    </div>
+                    <div id="step-2" class="p-3 rounded-lg border border-white/5 flex items-center gap-3 transition-all">
+                        <i data-lucide="layers" class="w-4 h-4"></i> Supervisor Agent
+                    </div>
+                    <div id="step-3" class="p-3 rounded-lg border border-white/5 flex items-center gap-3 transition-all">
+                        <i data-lucide="database" class="w-4 h-4"></i> Memory Palace (RAG)
+                    </div>
+                    <div id="step-4" class="p-3 rounded-lg border border-white/5 flex items-center gap-3 transition-all">
+                        <i data-lucide="wand-2" class="w-4 h-4"></i> Healer Agent
+                    </div>
+                </div>
+            </div>
 
-# ============================================================================
-# GLASSMORPHISM CSS STYLING
-# ============================================================================
+            <div class="glass p-4 flex-1">
+                <h3 class="text-sm font-semibold mb-2 text-gray-400 uppercase">Memory Insights</h3>
+                <div id="memory-logs" class="text-xs text-cyan-200/70 italic space-y-2">
+                    Waiting for execution...
+                </div>
+            </div>
+        </div>
 
-st.markdown(
-    """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+        <!-- Middle: Code Editor Space -->
+        <div class="col-span-6 glass flex flex-col overflow-hidden border-t-4 border-t-cyan-500">
+            <div class="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/5">
+                <span class="text-xs font-mono">main.tf</span>
+                <span id="status-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/50">ERRORED</span>
+            </div>
+            <div class="flex-1 p-4 overflow-auto scroll-custom bg-black/20">
+                <pre id="code-display" class="text-gray-400 leading-relaxed">
+resource "aws_instance" "web" {
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = "t2.micro"
 
-:root {
-    --bg: #0b0e14;
-    --panel: #14171f;
-    --accent: #00d2ff;
-    --success: #00ffa3;
-    --error: #ff3e6d;
-    --text-main: #ffffff;
-    --text-dim: #94a3b8;
-    --border: rgba(255, 255, 255, 0.06);
+  tags = {
+    Name = "Broken-Server
+  }
 }
 
-* { box-sizing: border-box; transition: all 0.25s ease; }
+resource "aws_s3_bucket" "logs" {
+  # Error: Missing required field 'bucket'
+}
+                </pre>
+            </div>
+        </div>
 
-body { background: var(--bg); color: var(--text-main); font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; }
+        <!-- Right: Terminal Logs -->
+        <div class="col-span-3 glass flex flex-col overflow-hidden bg-black/40">
+            <div class="px-4 py-2 border-b border-white/10 text-xs font-mono text-gray-500">Terminal Output</div>
+            <div id="terminal" class="flex-1 p-4 font-mono text-[11px] space-y-2 overflow-y-auto scroll-custom text-green-500/80">
+                <div>> System Ready.</div>
+                <div>> Awaiting Terraform scan...</div>
+            </div>
+        </div>
 
-header { height: 70px; border-bottom: 1px solid var(--border); display:flex; align-items:center; padding:0 30px; justify-content:space-between; }
-.logo { font-weight:900; font-size:1.6rem; letter-spacing:-0.8px; text-transform:uppercase; }
-.logo span { color: var(--accent); }
-.client-tag { font-size:0.75rem; color:var(--text-dim); background: rgba(255,255,255,0.05); padding:5px 12px; border-radius:6px; }
+    </main>
 
-.container { display:flex; flex:1; height: calc(100vh - 60px); overflow:hidden; }
-.chat-section { flex: 0 0 70%; display:flex; flex-direction:column; border-right:1px solid var(--border); background: radial-gradient(circle at top left, rgba(0,210,255,0.03), transparent); padding:15px; }
-.chat-output { flex:1; padding:15px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; background:var(--panel); border:1px solid var(--border); border-radius:14px; }
-.message { max-width:85%; padding:14px 16px; border-radius:14px; line-height:1.5; font-size:0.93rem; }
-.ai-msg { background: var(--panel); border:1px solid var(--border); border-bottom-left-radius:4px; }
-.user-msg { align-self:flex-end; background:var(--accent); color:#000; font-weight:600; border-bottom-right-radius:4px; }
-.chat-input-area { padding:30px 40px; border-top:1px solid var(--border); display:flex; gap:15px; }
-.input-wrapper { flex:1; background:var(--panel); border:1px solid var(--border); border-radius:12px; display:flex; align-items:center; padding:5px 15px; }
-.input-wrapper input { flex:1; background:transparent; border:none; color:white; padding:12px; outline:none; font-size:0.9rem; }
-.send-btn { background:var(--accent); border:none; width:45px; height:45px; border-radius:10px; cursor:pointer; color:#000; }
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
 
-.eval-section { flex:0 0 30%; background:#0f1218; padding:20px; display:flex; flex-direction:column; gap:15px; overflow-y:auto; }
-.eval-title { font-size:0.7rem; font-weight:800; color:var(--text-dim); text-transform:uppercase; letter-spacing:1px; }
-.pipeline-card { background:var(--panel); border-radius:14px; padding:14px; border:1px solid var(--border); }
-.step { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.03); opacity:0.4; color:var(--text-dim); }
-.step:last-child { border:none; }
-.step.active { opacity:1; color:var(--accent); }
-.step.done { opacity:1; color:var(--success); }
-.step.error { opacity:1; color:var(--error); }
-.step-icon { width:32px; height:32px; border-radius:8px; border:2px solid currentColor; display:flex; align-items:center; justify-content:center; font-size:0.8rem; background:rgba(255,255,255,0.02); }
-.step-label { font-size:0.85rem; font-weight:700; display:block; }
-.step-status { font-size:0.7rem; opacity:0.7; }
-#healing-module { margin-top:10px; padding:15px; background: rgba(255,62,109,0.05); border:1px solid rgba(255,62,109,0.15); border-radius:12px; display:none; }
-.progress-track { height:4px; background: rgba(255,255,255,0.05); border-radius:2px; margin-top:10px; overflow:hidden; }
-.progress-fill { width:0%; height:100%; background:var(--error); box-shadow:0 0 10px var(--error); animation: heal 2.5s infinite; }
-@keyframes heal { 0% { width:0%; } 100% { width:100%; } }
-.metrics-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin:15px 0; }
-.metric-box { background:var(--panel); padding:16px 12px; border-radius:12px; text-align:center; border:1px solid var(--border); display:flex; flex-direction:column; justify-content:center; min-height:90px; }
-.m-val { font-size:1.8rem; font-weight:900; color:var(--accent); display:block; line-height:1.1; }
-.m-lbl { font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; margin-top:8px; letter-spacing:0.6px; font-weight:700; }
+        const logs = [
+            { step: 1, text: "> Verifier: Found Syntax Error in main.tf (Line 6)", agent: "step-1" },
+            { step: 2, text: "> Supervisor: Classifying as 'Syntax/Missing_Closure'", agent: "step-2" },
+            { step: 3, text: "> Memory: Match found in VectorDB (Fix #442)", agent: "step-3", mem: "Retrieved similar fix: Added missing double-quote." },
+            { step: 4, text: "> Healer: Applying patch to main.tf...", agent: "step-4" },
+            { step: 5, text: "> Final Verifier: Validation Successful. Exit 0.", agent: "" }
+        ];
 
-hr.soft { border:none; border-top:1px solid rgba(255,255,255,0.08); margin:14px 0; }
-</style>
-""",
-    unsafe_allow_html=True,
-)
+        const fixedCode = `resource "aws_instance" "web" {
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = "t2.micro"
 
-# ============================================================================
-# UTILITY FUNCTIONS
-# ============================================================================
+  tags = {
+    Name = "Healed-Server"
+  }
+}
 
+resource "aws_s3_bucket" "logs" {
+  bucket = "company-logs-production-001"
+}`;
 
+        function addTerminalLine(text) {
+            const term = document.getElementById('terminal');
+            const div = document.createElement('div');
+            div.textContent = text;
+            term.appendChild(div);
+            term.scrollTop = term.scrollHeight;
+        }
 
+        async function startHealing() {
+            const status = document.getElementById('status-badge');
+            
+            for (let i = 0; i < logs.length; i++) {
+                const item = logs[i];
+                
+                // Highlight agent
+                if(item.agent) {
+                    document.querySelectorAll('#agent-list > div').forEach(el => el.classList.remove('agent-active', 'bg-white/10'));
+                    const currentAgent = document.getElementById(item.agent);
+                    currentAgent.classList.add('agent-active', 'bg-white/10');
+                }
 
-def save_uploaded_files(files: list[Any]) -> list[str]:
-    """Save uploaded files to docs directory."""
-    os.makedirs(DOCS_DIR, exist_ok=True)
-    saved: list[str] = []
-    for uploaded in files:
-        target = DOCS_DIR / uploaded.name
-        target.write_bytes(uploaded.getvalue())
-        saved.append(uploaded.name)
-    return saved
+                addTerminalLine(item.text);
+                
+                if(item.mem) {
+                    document.getElementById('memory-logs').innerHTML = `<div class="p-2 bg-cyan-500/10 rounded border border-cyan-500/20">${item.mem}</div>`;
+                }
 
+                // Simulate processing time
+                await new Promise(r => setTimeout(r, 1200));
 
-def parse_agent_trace(trace: str) -> dict[str, Any]:
-    """Parse trace output from RAG agent execution."""
-    lines = [line.strip() for line in trace.splitlines() if line.strip()]
-    retries = 0
-    grade_results: list[str] = []
-    rewritten_questions: list[str] = []
-    retrieved_docs: list[dict[str, str]] = []
+                if(item.step === 4) {
+                    document.getElementById('code-display').textContent = fixedCode;
+                    document.getElementById('code-display').classList.replace('text-gray-400', 'text-cyan-300');
+                }
+            }
 
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-
-        if line.lower().startswith("retry attempt:"):
-            try:
-                retries = max(retries, int(line.split(":", 1)[1].strip()))
-            except ValueError:
-                pass
-
-        if line.lower().startswith("grade result:"):
-            grade_results.append(line.split(":", 1)[1].strip().lower())
-
-        if line.lower().startswith("rewritten question:"):
-            rewritten_questions.append(line.split(":", 1)[1].strip())
-
-        match = re.match(r"^(\d+)\. source=(.*)$", line)
-        if match:
-            source = match.group(2).strip()
-            content = ""
-            if i + 1 < len(lines):
-                content = lines[i + 1]
-            retrieved_docs.append({"source": source, "content": content})
-
-        i += 1
-
-    final_grade = grade_results[-1] if grade_results else "fail"
-    last_rewritten = rewritten_questions[-1] if rewritten_questions else ""
-
-    return {
-        "retries": retries,
-        "grade_results": grade_results,
-        "final_grade": final_grade,
-        "rewritten_questions": rewritten_questions,
-        "last_rewritten": last_rewritten,
-        "retrieved_docs": retrieved_docs,
-    }
-
-
-def confidence_score(final_grade: str, retries: int) -> int:
-    """Calculate confidence score based on grade and retry count."""
-    if final_grade == "pass" and retries == 0:
-        return 96
-    if final_grade == "pass" and retries > 0:
-        return 82
-    if retries > 0:
-        return 45
-    return 23
-
-
-def calculate_doc_match_percentage(doc_count: int, max_docs: int = 3) -> int:
-    """Calculate document matching percentage."""
-    if max_docs == 0:
-        return 0
-    percentage = int((doc_count / max_docs) * 100)
-    return min(100, percentage)
-
-
-def run_backend_with_trace(question: str) -> dict[str, Any]:
-    """Execute RAG agent and capture trace."""
-    buffer = io.StringIO()
-    result_container: dict[str, Any] = {"answer": "", "error": None}
-
-    def target() -> None:
-        try:
-            with redirect_stdout(buffer):
-                result_container["answer"] = run_agent(question)
-        except Exception as exc:
-            result_container["error"] = str(exc)
-
-    thread = threading.Thread(target=target, daemon=True)
-    thread.start()
-    thread.join()
-
-    trace = buffer.getvalue()
-    parsed = parse_agent_trace(trace)
-
-    return {
-        "final_answer": result_container.get("answer") or "",
-        "grade_result": parsed.get("final_grade", "fail"),
-        "retries": int(parsed.get("retries", 0) or 0),
-        "retrieved_docs": parsed.get("retrieved_docs", []),
-        "rewritten_question": parsed.get("last_rewritten", ""),
-        "trace": trace,
-        "error": result_container.get("error"),
-    }
-
-
-def render_step(icon: str, title: str, status: str, status_text: str = "Waiting...") -> str:
-    """Render a step block matching the new theme."""
-    cls = f"step {status.lower()}" if status else "step"
-    progress_html = ""
-    if status.lower() == "active":
-        progress_html = "<div class='step-progress-track'><div class='step-progress-fill'></div></div>"
-    return (
-        f'<div class="{cls}" id="step-{title.replace(" ", "-").lower()}">'
-        f'<div class="step-icon">{icon}</div>'
-        f'<div style="flex:1;">'
-        f'<span class="step-label">{title}</span>'
-        f'<span class="step-status">{status_text}</span>'
-        f'{progress_html}'
-        f'</div>'
-        f'</div>'
-    )
-
-
-def render_evaluation_stage(
-    grade_result: str,
-    doc_match: int,
-    hallucination_confidence: int,
-    retrieved_docs_count: int,
-) -> str:
-    """Render evaluation stage with metrics."""
-    hallucination_detected = "Yes" if grade_result == "fail" else "No"
-    hallucination_text = "Potential hallucination detected in generated answer. Model may have used information not found in source documents."
-    
-    return f"""
-<div class="evaluation-section">
-    <div class="eval-title">Evaluation Stage</div>
-    <div class="eval-metric">
-        <span class="eval-label">Document Match</span>
-        <span class="eval-value">{doc_match}%</span>
-    </div>
-    <div class="eval-metric">
-        <span class="eval-label">Docs Retrieved</span>
-        <span class="eval-value">{retrieved_docs_count}/3</span>
-    </div>
-    <div class="eval-metric">
-        <span class="eval-label">Hallucination Detected</span>
-        <span class="eval-value">{hallucination_detected}</span>
-    </div>
-    <div class="eval-metric">
-        <span class="eval-label">Confidence</span>
-        <span class="eval-value">{100 - hallucination_confidence}%</span>
-    </div>
-    {f'<div class="hallucination-report">⚠️ {hallucination_text}</div>' if grade_result == "fail" else ""}
-</div>
+            status.textContent = "DEPLOYMENT READY";
+            status.classList.replace('bg-red-500/20', 'bg-green-500/20');
+            status.classList.replace('text-red-400', 'text-green-400');
+            status.classList.replace('border-red-500/50', 'border-green-500/50');
+            addTerminalLine("> System fully healed. Infrastructure consistent.");
+        }
+    </script>
+</body>
+</html>
 """
 
 
+def main() -> None:
+    st.title("AutoHeal IaC — UI Preview")
+    st.markdown("The HTML UI design is embedded below. Use the 'Initiate Healing' button in the UI to simulate the agent workflow.")
+    components.html(HTML_UI, height=820, scrolling=True)
 
-# ============================================================================
-# PAGE LAYOUT
-# ============================================================================
 
-# Header (top bar)
-st.markdown(
-    """
-    <header>
-        <div class="logo">REGENESIS<span>.AI</span></div>
-        <div class="client-tag">Project: XYZ_Production_RAG</div>
-    </header>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Main container columns (left chat 70%, right evaluation 30%)
-left, right = st.columns([7, 3], gap="large")
-
-with left:
-    # Upload section
-    with st.expander("📤 Upload Documents", expanded=True):
-        uploaded_files = st.file_uploader(
-            "Select documents to add to knowledge base",
-            type=["txt", "pdf", "md"],
-            accept_multiple_files=True,
-            key="doc_uploader",
-        )
-        if uploaded_files:
-            saved = save_uploaded_files(uploaded_files)
-            st.success(f"✓ Uploaded {len(saved)} document(s)")
-    
-    # Display already uploaded documents
-    with st.expander("📚 Knowledge Base Documents", expanded=True):
-        if DOCS_DIR.exists():
-            doc_files = list(DOCS_DIR.glob("*"))
-            if doc_files:
-                st.markdown("<div style='font-size:0.85rem;color:var(--text-dim);'>Currently loaded:</div>", unsafe_allow_html=True)
-                for doc_file in doc_files:
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.caption(f"📄 {doc_file.name}")
-                    with col2:
-                        if st.button("×", key=f"delete_{doc_file.name}", help="Remove document"):
-                            doc_file.unlink()
-                            st.rerun()
-            else:
-                st.markdown("<div style='font-size:0.85rem;color:var(--text-dim);padding:10px;'>No documents uploaded yet</div>", unsafe_allow_html=True)
-        else:
-            st.markdown("<div style='font-size:0.85rem;color:var(--text-dim);padding:10px;'>No documents uploaded yet</div>", unsafe_allow_html=True)
-    
-    # Chat area - OUTPUT label and messages appear only after execution
-    st.markdown("<div class='chat-section'>", unsafe_allow_html=True)
-    
-    output_label_placeholder = st.empty()
-    chat_output = st.empty()
-
-    # input area (left)
-    input_col1, input_col2 = st.columns([10, 1])
-    with input_col1:
-        user_input = st.text_input("", placeholder="Ask a question to the system...", key="chat_input")
-    with input_col2:
-        send = st.button("Send", key="send_left")
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-with right:
-    st.markdown("<div class='eval-section'>", unsafe_allow_html=True)
-    st.markdown("<div class='eval-title'>Live Pipeline Execution</div>", unsafe_allow_html=True)
-    pipeline_placeholder = st.empty()
-    healing_placeholder = st.empty()
-    metrics_placeholder = st.empty()
-    docs_placeholder = st.empty()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ============================================================================
-# EXECUTION LOGIC
-# ============================================================================
-
-# Handle send button or left send
-def execute_query_and_render(query_text: str, chat_out: Any):
-    if not query_text.strip():
-        st.warning("Please enter a question before sending.")
-        return
-
-    # Show OUTPUT label on first execution
-    output_label_placeholder.markdown("<div class='eval-title' style='margin-bottom:12px;'>📤 Output</div>", unsafe_allow_html=True)
-
-    # append user message
-    chat_out.markdown(f"<div class=\"message user-msg\">{query_text}</div>", unsafe_allow_html=True)
-
-    # show pipeline active states
-    pipeline_html_content = (
-        render_step('🔍', 'Document Retrieval', 'active', 'Retrieving...') +
-        render_step('🪄', 'RAG Generation', 'pending', 'Waiting...') +
-        render_step('🛡️', 'Hallucination Guard', 'pending', 'Waiting...')
-    )
-    pipeline_placeholder.markdown(f"<div class=\"pipeline-card\">{pipeline_html_content}</div>", unsafe_allow_html=True)
-
-    time.sleep(1.0)
-
-    # simulate progression
-    pipeline_html_content = (
-        render_step('🔍', 'Document Retrieval', 'done', '6 chunks retrieved') +
-        render_step('🪄', 'RAG Generation', 'active', 'Generating...') +
-        render_step('🛡️', 'Hallucination Guard', 'pending', 'Scanning...')
-    )
-    pipeline_placeholder.markdown(f"<div class=\"pipeline-card\">{pipeline_html_content}</div>", unsafe_allow_html=True)
-
-    time.sleep(1.5)
-
-    # run backend
-    result = run_backend_with_trace(query_text)
-    final_answer = result.get('final_answer', '')
-    grade_result = result.get('grade_result', 'fail')
-    retries = int(result.get('retries', 0) or 0)
-    retrieved_docs = result.get('retrieved_docs', []) or []
-
-    # final pipeline state
-    guard_state = 'done' if grade_result == 'pass' else 'error'
-    guard_text = 'Validated' if grade_result == 'pass' else 'Hallucination Detected'
-    pipeline_html_content = (
-        render_step('🔍', 'Document Retrieval', 'done', 'Completed') +
-        render_step('🪄', 'RAG Generation', 'done', 'Completed') +
-        render_step('🛡️', 'Hallucination Guard', guard_state, guard_text)
-    )
-    pipeline_placeholder.markdown(f"<div class=\"pipeline-card\">{pipeline_html_content}</div>", unsafe_allow_html=True)
-
-    # show healing if needed
-    if grade_result != 'pass':
-        healing_placeholder.markdown(
-            """
-            <div id="healing-module">
-                <div style="font-size:0.65rem;color:var(--error);font-weight:800;display:flex;justify-content:space-between;">
-                    <span><i class="fas fa-bolt"></i> SELF-HEALING ACTIVE</span>
-                    <span>FIX_V2</span>
-                </div>
-                <div class="progress-track"><div class="progress-fill"></div></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        time.sleep(2.8)
-        healing_placeholder.empty()
+if __name__ == "__main__":
+    main()
 
     # append final AI message
     ai_html = f"<div class=\"message ai-msg\"><strong>Response:</strong> {final_answer or 'No answer produced.'}</div>"
